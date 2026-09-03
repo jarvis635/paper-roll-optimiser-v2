@@ -59,6 +59,14 @@
           </div>
         </div>
       </transition>
+
+      <!-- Core Mode System Status Banner -->
+      <div v-if="capabilities.coreMode" class="core-mode-badge-bar mt-3 p-2 rounded">
+        <span class="clay-badge clay-badge-info">CORE MODE ACTIVE</span>
+        <span class="text-xs text-secondary ml-2 font-bold">
+          PLAX Optimiser is running in Core Mode. External cloud APIs isolated.
+        </span>
+      </div>
     </header>
 
     <!-- Main Content Views Container -->
@@ -165,6 +173,9 @@
 
                 <div v-if="mode_data.childErrors" class="alert-error mb-3">
                   ⚠️ {{ mode_data.childErrors }}
+                </div>
+                <div v-if="serverErrorMsg" class="alert-error mb-3 p-2 bg-red-100 rounded">
+                  ⚠️ {{ serverErrorMsg }}
                 </div>
 
                 <table class="clay-table">
@@ -546,31 +557,76 @@
         <!-- 5. GOOGLE SHEETS VIEW -->
         <div v-else-if="currentNav === 'sheets'" class="clay-card">
           <h2>📊 Google Sheets Integration</h2>
-          <p class="text-secondary">Import demand schedules directly from Google Drive spreadsheet URLs.</p>
 
-          <div class="sheets-form flex-column gap-3 max-w-md my-3">
-            <label class="font-bold">Spreadsheet URL</label>
-            <input type="text" class="clay-input" placeholder="https://docs.google.com/spreadsheets/d/..." />
-            <div class="action-btns">
-              <button class="clay-btn clay-btn-primary">Connect & Import Data</button>
+          <div class="degraded-notice-card p-3 my-3">
+            <div class="flex items-center gap-2">
+              <span class="clay-badge clay-badge-warning">INTEGRATION STATUS</span>
+              <span class="font-bold text-sm">Google Sheets is not connected. Manual entry is available.</span>
             </div>
+            <p class="text-secondary text-sm mt-2 m-0">
+              You can enter customer cut requirements and stock parameters manually in the Optimiser view without requiring a connected spreadsheet.
+            </p>
+            <button class="clay-btn clay-btn-primary text-sm mt-3" @click="navigate('optimise')">
+              ⚡ Go to Manual Optimiser
+            </button>
+          </div>
+
+          <div class="sheets-form flex-column gap-3 max-w-md my-3 opacity-75">
+            <label class="font-bold">Spreadsheet URL</label>
+            <input
+              type="text"
+              class="clay-input"
+              v-model="sheetUrlInput"
+              placeholder="https://docs.google.com/spreadsheets/d/..."
+            />
+            <div class="action-btns">
+              <button class="clay-btn" @click="attemptSheetConnect">
+                Connect Spreadsheet
+              </button>
+            </div>
+            <p v-if="sheetStatusMsg" class="alert-error text-xs m-0">
+              ⚠️ {{ sheetStatusMsg }}
+            </p>
           </div>
         </div>
 
         <!-- 6. ASK PLAXAI VIEW -->
         <div v-else-if="currentNav === 'ai'" class="clay-card">
           <h2>🤖 Ask PLAXAI Assistant</h2>
-          <p class="text-secondary">AI Optimization Assistant for paper roll cutting strategy recommendations.</p>
+
+          <div class="degraded-notice-card p-3 my-3">
+            <div class="flex items-center gap-2">
+              <span class="clay-badge clay-badge-warning">PLAXAI OFFLINE</span>
+              <span class="font-bold text-sm">PLAXAI is unavailable. Core optimisation remains available.</span>
+            </div>
+            <p class="text-secondary text-sm mt-2 m-0">
+              Cloud AI recommendation service is unconfigured or offline. Mathematical cutting stock calculations are processed locally by OR-Tools.
+            </p>
+            <button class="clay-btn clay-btn-primary text-sm mt-3" @click="navigate('optimise')">
+              ⚡ Open Optimiser Workspace
+            </button>
+          </div>
 
           <div class="chat-box my-3 p-3">
-            <div class="chat-message ai-message mb-2">
-              <b>PLAXAI:</b> Hello! I can help you analyze scrap reduction and suggest optimal stock widths. What is your question?
+            <div
+              v-for="(msg, idx) in aiMessages"
+              :key="idx"
+              class="chat-message mb-2"
+              :class="msg.sender === 'user' ? 'user-message text-right' : 'ai-message'"
+            >
+              <b>{{ msg.sender === 'user' ? 'You' : 'PLAXAI' }}:</b> {{ msg.text }}
             </div>
           </div>
 
           <div class="chat-input-row flex gap-2">
-            <input type="text" class="clay-input" placeholder="e.g. How can I minimize trim loss on 100cm parent rolls?" />
-            <button class="clay-btn clay-btn-primary">Send</button>
+            <input
+              type="text"
+              class="clay-input"
+              v-model="aiQueryInput"
+              @keydown.enter="sendAiQuery"
+              placeholder="e.g. How can I minimize trim loss on 100cm parent rolls?"
+            />
+            <button class="clay-btn clay-btn-primary" @click="sendAiQuery">Send</button>
           </div>
         </div>
 
@@ -649,6 +705,24 @@ export default {
       currentNav: "optimise",
       navLoading: false,
       mobileMenuOpen: false,
+
+      capabilities: {
+        sheetsConnected: false,
+        aiConnected: false,
+        serverConnected: true,
+        coreMode: true,
+      },
+
+      serverErrorMsg: null,
+      sheetUrlInput: "",
+      sheetStatusMsg: null,
+      aiQueryInput: "",
+      aiMessages: [
+        {
+          sender: "ai",
+          text: "PLAXAI is unavailable. Core optimisation remains available.",
+        },
+      ],
 
       navItems: [
         { id: "dashboard", label: "Dashboard", icon: "📊" },
@@ -868,7 +942,29 @@ export default {
       return { child_rects: newChilds, parent_rects: newParents };
     },
 
+    attemptSheetConnect() {
+      if (!this.sheetUrlInput.trim()) {
+        this.sheetStatusMsg = "Please enter a valid Google Sheets URL.";
+        return;
+      }
+      this.sheetStatusMsg = "Google Sheets is not connected. Manual entry is available.";
+    },
+
+    sendAiQuery() {
+      if (!this.aiQueryInput.trim()) return;
+      const query = this.aiQueryInput;
+      this.aiMessages.push({ sender: "user", text: query });
+      this.aiQueryInput = "";
+      setTimeout(() => {
+        this.aiMessages.push({
+          sender: "ai",
+          text: "PLAXAI is unavailable. Core optimisation remains available.",
+        });
+      }, 300);
+    },
+
     sendReq() {
+      this.serverErrorMsg = null;
       const endpoint = this.mode === "1d" ? "/stocks_1d" : "/stocks_2d";
       const url = window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1")
         ? `http://localhost:5000${endpoint}`
@@ -880,10 +976,13 @@ export default {
       axios.post(url, payload)
         .then((response) => {
           this.cutButtonDisabled = false;
+          this.capabilities.serverConnected = true;
           this.displayResult(response.data);
         })
         .catch((error) => {
           this.cutButtonDisabled = false;
+          this.capabilities.serverConnected = false;
+          this.serverErrorMsg = "Optimisation server is currently unavailable. Please ensure the Python OR-Tools backend service is running.";
           console.error("Optimization Server Request Error:", error);
         });
     },
@@ -1361,5 +1460,19 @@ export default {
 .auto-margin {
   margin-left: auto;
   margin-right: auto;
+}
+
+.core-mode-badge-bar {
+  background: rgba(74, 111, 165, 0.08);
+  border: 1px dashed rgba(74, 111, 165, 0.4);
+  display: flex;
+  align-items: center;
+}
+
+.degraded-notice-card {
+  background: var(--bg-stone-subtle);
+  border-left: 4px solid #d97706;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--clay-shadow-inset);
 }
 </style>
