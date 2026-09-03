@@ -158,7 +158,15 @@
               <div class="clay-card">
                 <div class="card-header-flex mb-3">
                   <div>
-                    <h3 class="m-0">1. Cut Requirements</h3>
+                    <div class="flex items-center gap-2 mb-1">
+                      <h3 class="m-0">1. Cut Requirements</h3>
+                      <span v-if="dataSource === 'sheets'" class="clay-badge clay-badge-info">
+                        📊 GOOGLE SHEETS IMPORTED
+                      </span>
+                      <span v-else class="clay-badge clay-badge-neutral">
+                        ✏️ MANUAL ENTRY
+                      </span>
+                    </div>
                     <p class="text-secondary text-sm m-0">{{ mode_data.childMessage }}</p>
                   </div>
                   <div class="header-actions">
@@ -556,37 +564,146 @@
 
         <!-- 5. GOOGLE SHEETS VIEW -->
         <div v-else-if="currentNav === 'sheets'" class="clay-card">
-          <h2>📊 Google Sheets Integration</h2>
-
-          <div class="degraded-notice-card p-3 my-3">
-            <div class="flex items-center gap-2">
-              <span class="clay-badge clay-badge-warning">INTEGRATION STATUS</span>
-              <span class="font-bold text-sm">Google Sheets is not connected. Manual entry is available.</span>
+          <div class="card-header-flex mb-3">
+            <div>
+              <h2 class="m-0">📑 Google Sheets Integration</h2>
+              <p class="text-secondary text-sm m-0">Connect external spreadsheets as an optional data connector.</p>
             </div>
-            <p class="text-secondary text-sm mt-2 m-0">
-              You can enter customer cut requirements and stock parameters manually in the Optimiser view without requiring a connected spreadsheet.
-            </p>
-            <button class="clay-btn clay-btn-primary text-sm mt-3" @click="navigate('optimise')">
-              ⚡ Go to Manual Optimiser
-            </button>
+            <div>
+              <span v-if="sheetsConfig.connected" class="clay-badge clay-badge-success">CONNECTED</span>
+              <span v-else class="clay-badge clay-badge-warning">DISCONNECTED</span>
+            </div>
           </div>
 
-          <div class="sheets-form flex-column gap-3 max-w-md my-3 opacity-75">
-            <label class="font-bold">Spreadsheet URL</label>
-            <input
-              type="text"
-              class="clay-input"
-              v-model="sheetUrlInput"
-              placeholder="https://docs.google.com/spreadsheets/d/..."
-            />
-            <div class="action-btns">
-              <button class="clay-btn" @click="attemptSheetConnect">
-                Connect Spreadsheet
-              </button>
+          <!-- Connection Status Card -->
+          <div class="sheets-status-card p-4 mb-4 rounded-lg">
+            <div class="flex justify-between items-center flex-wrap gap-3">
+              <div>
+                <span class="text-xs uppercase font-bold text-secondary block mb-1">DATA SOURCE STATUS</span>
+                <h3 class="m-0 text-lg flex items-center gap-2">
+                  <span v-if="sheetsConfig.connected" class="pulse-dot green-dot"></span>
+                  <span v-else class="pulse-dot gray-dot"></span>
+                  <span>{{ sheetsConfig.connected ? 'Google Sheets Active' : 'Manual Entry Active (Spreadsheet Disconnected)' }}</span>
+                </h3>
+              </div>
+              <div v-if="sheetsConfig.connected" class="text-right">
+                <span class="text-xs text-secondary block font-bold">LAST SYNCED</span>
+                <span class="font-bold text-sm">{{ sheetsConfig.lastSyncTime || 'Just now' }}</span>
+              </div>
             </div>
-            <p v-if="sheetStatusMsg" class="alert-error text-xs m-0">
-              ⚠️ {{ sheetStatusMsg }}
+
+            <!-- Connected Metadata Overview -->
+            <div v-if="sheetsConfig.connected" class="sheets-meta-grid mt-3 pt-3 border-top">
+              <div><b>Sheet ID:</b> <code class="text-xs">{{ sheetsConfig.sheetId }}</code></div>
+              <div><b>Tab Name:</b> <span>{{ sheetsConfig.sheetName }}</span></div>
+              <div><b>Records Loaded:</b> <span class="font-bold">{{ sheetsConfig.rowsCount }} rows</span></div>
+            </div>
+          </div>
+
+          <!-- Connecting Animation Overlay / Banner -->
+          <div v-if="sheetsState.isConnecting" class="clay-card animation-card my-4 p-4 text-center">
+            <div class="pulse-ring-container auto-margin mb-3">
+              <div class="pulse-ring"></div>
+              <span class="pulse-icon">⚡</span>
+            </div>
+            <h3 class="m-0 mb-1 font-bold">Connecting to Google Sheets</h3>
+            <p class="text-secondary text-sm m-0 mb-3">{{ sheetsState.stepMessage }}</p>
+            <div class="connection-progress-bar auto-margin">
+              <div class="connection-progress-fill" :style="{ width: (sheetsState.stepNumber * 25) + '%' }"></div>
+            </div>
+          </div>
+
+          <!-- Success Banner with Check Animation -->
+          <div v-if="sheetsState.showSuccessAnim" class="clay-card success-banner my-4 p-4 text-center">
+            <div class="success-check-badge auto-margin mb-2">✓</div>
+            <h3 class="m-0 text-success font-bold">Google Sheets Connected</h3>
+            <p class="text-secondary text-sm m-0 mt-1">Spreadsheet orders mapped and ready to import into Optimiser.</p>
+          </div>
+
+          <!-- Error Alert Notice -->
+          <div v-if="sheetsState.errorMsg" class="alert-error-card p-3 my-3">
+            <div class="flex items-center gap-2">
+              <span class="clay-badge clay-badge-danger">CONNECTION ERROR</span>
+              <span class="font-bold text-sm">{{ sheetsState.errorMsg }}</span>
+            </div>
+            <p class="text-secondary text-xs mt-2 m-0">
+              Core optimisation remains 100% operational using Manual Entry.
             </p>
+          </div>
+
+          <!-- Configuration Form -->
+          <div class="clay-card my-3">
+            <h3 class="m-0 mb-3">Spreadsheet Configuration</h3>
+            <div class="sheets-form flex-column gap-3 max-w-lg">
+              <div>
+                <label class="font-bold text-sm block mb-1">Google Sheet ID or Shareable Link</label>
+                <input
+                  type="text"
+                  class="clay-input"
+                  v-model="sheetsForm.sheetIdInput"
+                  placeholder="e.g. 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms or full URL"
+                />
+                <span class="text-xs text-secondary mt-1 block">Ensure link sharing is set to "Anyone with the link can view".</span>
+              </div>
+
+              <div class="form-row-2">
+                <div>
+                  <label class="font-bold text-sm block mb-1">Sheet / Tab Name</label>
+                  <input
+                    type="text"
+                    class="clay-input"
+                    v-model="sheetsForm.sheetNameInput"
+                    placeholder="Sheet1"
+                  />
+                </div>
+                <div>
+                  <label class="font-bold text-sm block mb-1">Optional Range</label>
+                  <input
+                    type="text"
+                    class="clay-input"
+                    v-model="sheetsForm.rangeInput"
+                    placeholder="e.g. A1:D50 (Optional)"
+                  />
+                </div>
+              </div>
+
+              <div class="action-trigger-row mt-3">
+                <button
+                  v-if="!sheetsConfig.connected"
+                  class="clay-btn clay-btn-primary"
+                  :disabled="sheetsState.isConnecting"
+                  @click="connectGoogleSheets"
+                >
+                  <span v-if="!sheetsState.isConnecting">⚡ Connect Sheet</span>
+                  <span v-else>Connecting...</span>
+                </button>
+
+                <button
+                  v-if="sheetsConfig.connected"
+                  class="clay-btn clay-btn-primary"
+                  :disabled="sheetsState.isConnecting"
+                  @click="syncGoogleSheets"
+                >
+                  🔄 Sync / Refresh Data
+                </button>
+
+                <button
+                  v-if="sheetsConfig.connected"
+                  class="clay-btn clay-btn-danger"
+                  @click="disconnectGoogleSheets"
+                >
+                  Disconnect Sheet
+                </button>
+
+                <button
+                  v-if="sheetsConfig.connected"
+                  class="clay-btn"
+                  @click="importSheetToOptimiser"
+                >
+                  📥 Load into Optimiser
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -714,8 +831,33 @@ export default {
       },
 
       serverErrorMsg: null,
-      sheetUrlInput: "",
-      sheetStatusMsg: null,
+
+      dataSource: "manual", // "manual" or "sheets"
+
+      sheetsForm: {
+        sheetIdInput: "",
+        sheetNameInput: "Sheet1",
+        rangeInput: "",
+      },
+
+      sheetsConfig: {
+        connected: false,
+        sheetId: "",
+        sheetName: "Sheet1",
+        range: "",
+        lastSyncTime: null,
+        rowsCount: 0,
+        dataPayload: null,
+      },
+
+      sheetsState: {
+        isConnecting: false,
+        stepNumber: 0,
+        stepMessage: "",
+        showSuccessAnim: false,
+        errorMsg: null,
+      },
+
       aiQueryInput: "",
       aiMessages: [
         {
@@ -942,12 +1084,135 @@ export default {
       return { child_rects: newChilds, parent_rects: newParents };
     },
 
-    attemptSheetConnect() {
-      if (!this.sheetUrlInput.trim()) {
-        this.sheetStatusMsg = "Please enter a valid Google Sheets URL.";
+    connectGoogleSheets() {
+      this.sheetsState.errorMsg = null;
+      this.sheetsState.showSuccessAnim = false;
+
+      if (!this.sheetsForm.sheetIdInput.trim()) {
+        this.sheetsState.errorMsg = "Invalid Sheet ID. Please enter a valid Google Sheet ID or URL.";
         return;
       }
-      this.sheetStatusMsg = "Google Sheets is not connected. Manual entry is available.";
+
+      const url = window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1")
+        ? "http://localhost:5000/sheets/fetch"
+        : "/sheets/fetch";
+
+      this.sheetsState.isConnecting = true;
+      this.sheetsState.stepNumber = 1;
+      this.sheetsState.stepMessage = "Validating Sheet ID and configuration...";
+
+      setTimeout(() => {
+        this.sheetsState.stepNumber = 2;
+        this.sheetsState.stepMessage = "Testing server connection...";
+
+        axios.post(url, {
+          sheet_id: this.sheetsForm.sheetIdInput,
+          sheet_name: this.sheetsForm.sheetNameInput || "Sheet1",
+          range: this.sheetsForm.rangeInput,
+        })
+          .then((response) => {
+            this.sheetsState.stepNumber = 3;
+            this.sheetsState.stepMessage = "Retrieving metadata & parsing structure...";
+
+            setTimeout(() => {
+              this.sheetsState.stepNumber = 4;
+              this.sheetsState.stepMessage = "Mapping rows to application input model...";
+
+              setTimeout(() => {
+                this.sheetsState.isConnecting = false;
+                if (response.data.status === "success") {
+                  const now = new Date();
+                  this.sheetsConfig.connected = true;
+                  this.sheetsConfig.sheetId = response.data.sheet_id;
+                  this.sheetsConfig.sheetName = response.data.sheet_name;
+                  this.sheetsConfig.range = this.sheetsForm.rangeInput;
+                  this.sheetsConfig.lastSyncTime = now.toLocaleTimeString();
+                  this.sheetsConfig.rowsCount = response.data.rows_count;
+                  this.sheetsConfig.dataPayload = response.data;
+
+                  this.capabilities.sheetsConnected = true;
+                  this.sheetsState.showSuccessAnim = true;
+
+                  setTimeout(() => {
+                    this.sheetsState.showSuccessAnim = false;
+                  }, 4000);
+                } else {
+                  this.sheetsState.errorMsg = response.data.message || "Failed to connect to Google Sheets.";
+                }
+              }, 300);
+            }, 300);
+          })
+          .catch((error) => {
+            this.sheetsState.isConnecting = false;
+            if (error.response && error.response.data && error.response.data.message) {
+              this.sheetsState.errorMsg = error.response.data.message;
+            } else {
+              this.sheetsState.errorMsg = "Network unavailable. Please verify connection and backend service.";
+            }
+          });
+      }, 300);
+    },
+
+    syncGoogleSheets() {
+      if (!this.sheetsConfig.connected) return;
+      this.connectGoogleSheets();
+    },
+
+    disconnectGoogleSheets() {
+      this.sheetsConfig.connected = false;
+      this.sheetsConfig.dataPayload = null;
+      this.capabilities.sheetsConnected = false;
+      this.sheetsState.showSuccessAnim = false;
+      this.sheetsState.errorMsg = null;
+      this.dataSource = "manual";
+    },
+
+    importSheetToOptimiser() {
+      if (!this.sheetsConfig.dataPayload) {
+        this.sheetsState.errorMsg = "No sheet data loaded. Please connect a spreadsheet first.";
+        return;
+      }
+
+      if (this.mode_data.childs && this.mode_data.childs.length > 0) {
+        const hasCustomData = this.mode_data.childs.some(c => c.width && c.width !== "30" && c.width !== "27");
+        if (hasCustomData) {
+          if (!confirm("Import data from Google Sheets? (This will update the Optimiser input fields)")) {
+            return;
+          }
+        }
+      }
+
+      const payload = this.sheetsConfig.dataPayload;
+
+      if (this.mode === "1d") {
+        if (payload.child_rolls && payload.child_rolls.length) {
+          this.mode1d.childs = payload.child_rolls.map(r => ({ quantity: String(r[0]), width: String(r[1]) }));
+        }
+        if (payload.parent_rolls && payload.parent_rolls.length) {
+          this.mode1d.parents = payload.parent_rolls.map(r => ({ quantity: "Auto", width: String(r[1]) }));
+        }
+      } else {
+        if (payload.child_rects && payload.child_rects.length) {
+          // Group 2d child rects by dimension
+          const counts = {};
+          payload.child_rects.forEach(r => {
+            const key = `${r[0]}x${r[1]}`;
+            if (!counts[key]) counts[key] = { width: String(r[0]), height: String(r[1]), quantity: 0 };
+            counts[key].quantity += 1;
+          });
+          this.mode2d.childs = Object.values(counts).map(item => ({
+            width: item.width,
+            height: item.height,
+            quantity: String(item.quantity)
+          }));
+        }
+        if (payload.parent_rects && payload.parent_rects.length) {
+          this.mode2d.parents = [{ width: String(payload.parent_rects[0][0]), height: String(payload.parent_rects[0][1]), quantity: "Auto" }];
+        }
+      }
+
+      this.dataSource = "sheets";
+      this.navigate("optimise");
     },
 
     sendAiQuery() {
@@ -1474,5 +1739,122 @@ export default {
   border-left: 4px solid #d97706;
   border-radius: var(--radius-sm);
   box-shadow: var(--clay-shadow-inset);
+}
+
+.sheets-status-card {
+  background: var(--bg-stone-subtle);
+  box-shadow: var(--clay-shadow-inset);
+}
+
+.sheets-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.green-dot {
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.gray-dot {
+  background: #9ca3af;
+}
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .form-row-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.animation-card {
+  background: rgba(74, 111, 165, 0.05);
+  border: 1px solid rgba(74, 111, 165, 0.2);
+}
+
+.pulse-ring-container {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pulse-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(74, 111, 165, 0.3);
+  animation: pulse-ring-anim 1.4s infinite ease-out;
+}
+
+@keyframes pulse-ring-anim {
+  0% { transform: scale(0.8); opacity: 0.9; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.pulse-icon {
+  font-size: 1.5rem;
+  z-index: 1;
+}
+
+.connection-progress-bar {
+  width: 200px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.connection-progress-fill {
+  height: 100%;
+  background: var(--accent-primary);
+  transition: width 0.3s ease;
+}
+
+.success-banner {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.success-check-badge {
+  width: 42px;
+  height: 42px;
+  background: #10b981;
+  color: white;
+  border-radius: 50%;
+  font-size: 1.4rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.alert-error-card {
+  background: rgba(220, 38, 38, 0.08);
+  border-left: 4px solid var(--accent-danger);
+  border-radius: var(--radius-sm);
+}
+
+.clay-badge-neutral {
+  background: var(--bg-stone-subtle);
+  color: var(--text-secondary);
 }
 </style>
