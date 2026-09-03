@@ -1,5 +1,7 @@
 <template>
-  <CspTool msg="Let's Go"/>
+  <div class="app-container">
+    <CspTool />
+  </div>
 </template>
 
 <script>
@@ -14,12 +16,11 @@ export default {
 </script>
 
 <style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
+@import './assets/claymorphism.css';
+
+.app-container {
+  min-height: 100vh;
+  padding: 32px 20px;
+  box-sizing: border-box;
 }
 </style>
