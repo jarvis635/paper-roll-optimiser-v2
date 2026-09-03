@@ -1,0 +1,16 @@
+
+> frontend@0.1.0 serve
+> vue-cli-service serve
+
+ ERROR  TypeError: transpileDependencies.map is not a function
+TypeError: transpileDependencies.map is not a function
+    at genTranspileDepRegex (/app/deployment/frontend/node_modules/@vue/cli-plugin-babel/index.js:6:38)
+    at module.exports (/app/deployment/frontend/node_modules/@vue/cli-plugin-babel/index.js:22:29)
+    at /app/deployment/frontend/node_modules/@vue/cli-service/lib/Service.js:82:9
+    at Array.forEach (<anonymous>)
+    at loadedCallback (/app/deployment/frontend/node_modules/@vue/cli-service/lib/Service.js:80:20)
+    at Service.init (/app/deployment/frontend/node_modules/@vue/cli-service/lib/Service.js:97:14)
+    at Service.run (/app/deployment/frontend/node_modules/@vue/cli-service/lib/Service.js:247:16)
+    at Object.<anonymous> (/app/deployment/frontend/node_modules/@vue/cli-service/bin/vue-cli-service.js:37:9)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
