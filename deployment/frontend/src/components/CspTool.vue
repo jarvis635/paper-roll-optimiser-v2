@@ -120,7 +120,7 @@
           </div>
         </div>
 
-        <!-- 2. OPTIMISE VIEW (Primary Solver UI) -->
+        <!-- 2. OPTIMISE VIEW (Primary Workflow UI) -->
         <div v-else-if="currentNav === 'optimise'">
           <!-- Mode Tabs (1D vs 2D) -->
           <div class="subnav-row mb-3">
@@ -142,15 +142,15 @@
             </div>
           </div>
 
-          <!-- Workspace Grid -->
+          <!-- Workflow Workspace Grid -->
           <div class="workspace-grid">
-            <!-- Input Panel (Left) -->
+            <!-- Manual Input Panel (Left) -->
             <div class="input-panel flex-column gap-4">
-              <!-- Demand Items Card -->
+              <!-- Step 1: Demand Specifications -->
               <div class="clay-card">
                 <div class="card-header-flex mb-3">
                   <div>
-                    <h3 class="m-0">{{ mode_data.childTitle }}</h3>
+                    <h3 class="m-0">1. Cut Requirements</h3>
                     <p class="text-secondary text-sm m-0">{{ mode_data.childMessage }}</p>
                   </div>
                   <div class="header-actions">
@@ -164,15 +164,15 @@
                 </div>
 
                 <div v-if="mode_data.childErrors" class="alert-error mb-3">
-                  {{ mode_data.childErrors }}
+                  ⚠️ {{ mode_data.childErrors }}
                 </div>
 
                 <table class="clay-table">
                   <thead>
                     <tr>
                       <th width="8%">#</th>
-                      <th width="32%">Width</th>
-                      <th v-if="mode === '2d'" width="32%">Height</th>
+                      <th width="32%">Width (cm)</th>
+                      <th v-if="mode === '2d'" width="32%">Height (cm)</th>
                       <th width="28%">Quantity</th>
                       <th width="10%"></th>
                     </tr>
@@ -189,7 +189,7 @@
                           type="text"
                           class="clay-input"
                           v-model="child.width"
-                          placeholder="e.g. 30"
+                          placeholder="Width"
                         />
                       </td>
                       <td v-if="mode === '2d'">
@@ -197,7 +197,7 @@
                           type="text"
                           class="clay-input"
                           v-model="child.height"
-                          placeholder="e.g. 20"
+                          placeholder="Height"
                         />
                       </td>
                       <td>
@@ -205,7 +205,7 @@
                           type="text"
                           class="clay-input"
                           v-model="child.quantity"
-                          placeholder="e.g. 5"
+                          placeholder="Qty"
                         />
                       </td>
                       <td class="text-center">
@@ -221,25 +221,25 @@
                 </table>
               </div>
 
-              <!-- Stock Settings Card -->
+              <!-- Step 2: Parent Stock Dimensions & Strategy -->
               <div class="clay-card mt-4">
                 <div class="card-header-flex mb-3">
                   <div>
-                    <h3 class="m-0">{{ mode_data.parentTitle }}</h3>
+                    <h3 class="m-0">2. Parent Stock & Constraints</h3>
                     <p class="text-secondary text-sm m-0">{{ mode_data.parentMessage }}</p>
                   </div>
                 </div>
 
                 <div v-if="mode_data.parentErrors" class="alert-error mb-3">
-                  {{ mode_data.parentErrors }}
+                  ⚠️ {{ mode_data.parentErrors }}
                 </div>
 
-                <table class="clay-table">
+                <table class="clay-table mb-3">
                   <thead>
                     <tr>
                       <th width="8%">#</th>
-                      <th width="32%">Width</th>
-                      <th v-if="mode === '2d'" width="32%">Height</th>
+                      <th width="32%">Width (cm)</th>
+                      <th v-if="mode === '2d'" width="32%">Height (cm)</th>
                       <th width="28%">Quantity</th>
                       <th width="10%"></th>
                     </tr>
@@ -256,7 +256,7 @@
                           type="text"
                           class="clay-input"
                           v-model="parent.width"
-                          placeholder="e.g. 100"
+                          placeholder="Stock Width"
                         />
                       </td>
                       <td v-if="mode === '2d'">
@@ -264,7 +264,7 @@
                           type="text"
                           class="clay-input"
                           v-model="parent.height"
-                          placeholder="e.g. 100"
+                          placeholder="Stock Height"
                         />
                       </td>
                       <td>
@@ -286,14 +286,9 @@
                     </tr>
                   </tbody>
                 </table>
-              </div>
-            </div>
 
-            <!-- Control & Visualization Panel (Right) -->
-            <div class="output-panel flex-column gap-4">
-              <!-- Controls & Optimise Actions -->
-              <div class="clay-card">
-                <div class="controls-row mb-3">
+                <div v-if="mode === '1d'" class="strategy-selector p-3 rounded">
+                  <span class="font-bold text-sm block mb-2">Optimization Objective Strategy:</span>
                   <div class="radio-group">
                     <label class="radio-label">
                       <input
@@ -303,7 +298,7 @@
                         v-model="cutStyle"
                       />
                       <span class="radio-custom"></span>
-                      <span>Exact Cuts</span>
+                      <span>Exact Cuts (Strict Demand)</span>
                     </label>
 
                     <label class="radio-label">
@@ -314,38 +309,66 @@
                         v-model="cutStyle"
                       />
                       <span class="radio-custom"></span>
-                      <span>Minimize Waste</span>
+                      <span>Minimize Waste (Over-cut Allowed)</span>
                     </label>
-                  </div>
-
-                  <div class="action-btns">
-                    <button
-                      class="clay-btn clay-btn-primary"
-                      :disabled="cutButtonDisabled"
-                      @click="cutSheets()"
-                    >
-                      <b>⚡ Run Optimiser</b>
-                    </button>
-                    <button
-                      class="clay-btn"
-                      :disabled="cutButtonDisabled"
-                      @click="reset()"
-                    >
-                      Reset
-                    </button>
                   </div>
                 </div>
               </div>
 
-              <!-- Result Status & Visualization Container -->
-              <div class="clay-card">
-                <div class="card-header-flex mb-3" v-if="mode_data.result">
-                  <div>
-                    <h3 class="m-0">Optimization Plan</h3>
-                    <span class="clay-badge clay-badge-success mt-1">
-                      {{ mode_data.result.statusName }}
+              <!-- Action Control Trigger Card -->
+              <div class="clay-card mt-4">
+                <div class="action-trigger-row">
+                  <button
+                    class="clay-btn clay-btn-primary optimise-hero-btn"
+                    :disabled="cutButtonDisabled"
+                    @click="cutSheets()"
+                  >
+                    <span v-if="!cutButtonDisabled">⚡ OPTIMISE</span>
+                    <span v-else class="flex items-center gap-2">
+                      <span class="loading-spinner-sm"></span>
+                      <span>Running Solver...</span>
                     </span>
+                  </button>
+
+                  <button
+                    class="clay-btn"
+                    :disabled="cutButtonDisabled"
+                    @click="reset()"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Output & Detailed Cutting Results (Right) -->
+            <div class="output-panel flex-column gap-4">
+              <!-- Solver Progress & Execution Status Banner -->
+              <div v-if="cutButtonDisabled" class="clay-card progress-banner">
+                <div class="progress-status-flex">
+                  <div class="loading-spinner"></div>
+                  <div>
+                    <h4 class="m-0 font-bold">Executing OR-Tools Optimization Engine</h4>
+                    <p class="m-0 text-secondary text-sm">Evaluating mathematical capacity constraints and pattern generation...</p>
                   </div>
+                </div>
+              </div>
+
+              <!-- Results Card -->
+              <div v-if="mode_data.result" class="clay-card">
+                <div class="card-header-flex mb-3">
+                  <div>
+                    <h3 class="m-0">Optimised Cutting Plan</h3>
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="clay-badge clay-badge-success">
+                        STATUS: {{ mode_data.result.statusName }}
+                      </span>
+                      <span class="text-secondary text-sm font-bold">
+                        (Solutions Evaluated: {{ mode_data.result.numSolutions }})
+                      </span>
+                    </div>
+                  </div>
+
                   <button
                     v-if="mode === '1d'"
                     class="clay-btn text-sm"
@@ -355,25 +378,42 @@
                   </button>
                 </div>
 
-                <div id="d3_area" class="d3-container my-3">
-                  <svg class="w-100"></svg>
-                </div>
-
-                <!-- Cut Details Table for 1D -->
-                <div v-if="mode_data.result && mode === '1d'" class="mt-4">
-                  <div class="summary-metrics mb-3">
-                    <div class="metric-pill">
-                      <span class="metric-label">Required Stock</span>
-                      <span class="metric-value">{{ mode_data.result.solutions.length }} rolls</span>
-                    </div>
+                <!-- Summary Efficiency Metrics Bar -->
+                <div class="summary-metrics-grid mb-4">
+                  <div class="metric-card">
+                    <span class="metric-value">{{ totalStockItemsUsed }}</span>
+                    <span class="metric-label">{{ mode === '1d' ? 'Stock Rolls Used' : 'Stock Sheets Used' }}</span>
                   </div>
 
+                  <div class="metric-card">
+                    <span class="metric-value text-success">{{ averageYieldPercentage }}%</span>
+                    <span class="metric-label">Average Material Utilization</span>
+                  </div>
+
+                  <div class="metric-card">
+                    <span class="metric-value text-warning">{{ totalWasteAmount }}</span>
+                    <span class="metric-label">Total Scrap Waste Length</span>
+                  </div>
+                </div>
+
+                <!-- Actual Result Visual Diagram -->
+                <div class="diagram-section mb-4">
+                  <h4 class="m-0 mb-2 text-sm font-bold text-secondary">ACTUAL SOLVER DIAGRAM</h4>
+                  <div id="d3_area" class="d3-container">
+                    <svg class="w-100"></svg>
+                  </div>
+                </div>
+
+                <!-- Detailed Cutting Result Breakdown -->
+                <div v-if="mode === '1d'" class="breakdown-section mt-4">
+                  <h4 class="m-0 mb-2 font-bold">Detailed Cut Breakdown</h4>
                   <table class="clay-table">
                     <thead>
                       <tr>
-                        <th width="15%">Stock Roll</th>
-                        <th width="25%">Utilization</th>
-                        <th width="60%">Cut Pattern (Widths)</th>
+                        <th width="12%">Roll</th>
+                        <th width="28%">Efficiency Yield</th>
+                        <th width="40%">Cut Widths</th>
+                        <th width="20%">Leftover Waste</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -395,14 +435,53 @@
                           </div>
                         </td>
                         <td>
-                          <span class="cut-pattern-text">
+                          <span class="cut-pattern-text font-bold">
                             {{ bigRoll[1].join(", ") }}
                           </span>
+                        </td>
+                        <td class="text-center font-bold text-secondary">
+                          {{ Math.round(bigRoll[0] * 100) / 100 }} cm
                         </td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
+
+                <!-- 2D Sheet Breakdown -->
+                <div v-if="mode === '2d' && mode_data.result.solutions" class="breakdown-section mt-4">
+                  <h4 class="m-0 mb-2 font-bold">2D Rectangle Coordinates Layout</h4>
+                  <table class="clay-table">
+                    <thead>
+                      <tr>
+                        <th>Rectangle #</th>
+                        <th>Top-Left (x1, y1)</th>
+                        <th>Bottom-Right (x2, y2)</th>
+                        <th>Dimensions (W × H)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        v-for="(rect, index) in mode_data.result.solutions[0]"
+                        :key="index"
+                        class="clay-row"
+                      >
+                        <td class="font-bold text-secondary">Item #{{ index + 1 }}</td>
+                        <td>({{ rect[0] }}, {{ rect[1] }})</td>
+                        <td>({{ rect[2] }}, {{ rect[3] }})</td>
+                        <td class="font-bold">{{ rect[2] - rect[0] }} × {{ rect[3] - rect[1] }} cm</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Initial State Prompt prior to running solver -->
+              <div v-else-if="!cutButtonDisabled && !mode_data.result" class="clay-card empty-result-prompt p-4 text-center">
+                <span class="prompt-icon">⚡</span>
+                <h3 class="m-0 my-2">Ready to Optimise</h3>
+                <p class="text-secondary text-sm max-w-sm m-0 auto-margin">
+                  Enter customer cut requirements and stock roll dimensions on the left, then click <b>⚡ OPTIMISE</b> to calculate minimum stock roll waste.
+                </p>
               </div>
             </div>
           </div>
@@ -593,10 +672,9 @@ export default {
         childErrors: null,
         parentErrors: null,
         result: null,
-        childTitle: "Small Rolls & Cut Demands",
-        childMessage: "Specify target width and required quantity for 1D cutting",
-        parentTitle: "Parent Stock Roll",
-        parentMessage: "Parent stock roll length",
+        childMessage: "Specify cut length (cm) and required quantity",
+        parentTitle: "Stock Roll Specification",
+        parentMessage: "Parent stock roll width (cm)",
       },
 
       mode2d: {
@@ -605,10 +683,9 @@ export default {
         childErrors: null,
         parentErrors: null,
         result: null,
-        childTitle: "Small Rectangular Sheets",
-        childMessage: "Specify dimensions (W × H) and quantity",
+        childMessage: "Specify dimensions (W × H cm) and quantity",
         parentTitle: "Parent Sheet Stock",
-        parentMessage: "Specify stock sheet width and height",
+        parentMessage: "Specify stock sheet width and height (cm)",
       },
 
       mode_data: null,
@@ -624,6 +701,32 @@ export default {
   computed: {
     currentNavMeta() {
       return this.navItems.find(i => i.id === this.currentNav) || { label: "View" };
+    },
+
+    totalStockItemsUsed() {
+      if (!this.mode_data?.result?.solutions) return 0;
+      return this.mode_data.result.solutions.length;
+    },
+
+    averageYieldPercentage() {
+      if (!this.mode_data?.result?.solutions || !this.mode_data.result.solutions.length) return 0;
+      const pWidth = parseInt(this.mode_data.parents[0].width) || 1;
+      let totalYield = 0;
+      this.mode_data.result.solutions.forEach(roll => {
+        const unused = roll[0];
+        const yieldPct = ((pWidth - unused) * 100) / pWidth;
+        totalYield += yieldPct;
+      });
+      return Math.round((totalYield / this.mode_data.result.solutions.length) * 10) / 10;
+    },
+
+    totalWasteAmount() {
+      if (!this.mode_data?.result?.solutions) return "0 cm";
+      let totalWaste = 0;
+      this.mode_data.result.solutions.forEach(roll => {
+        totalWaste += roll[0];
+      });
+      return `${Math.round(totalWaste * 10) / 10} cm`;
     }
   },
 
@@ -723,7 +826,7 @@ export default {
         for (let j = 0; j < labels.length; j++) {
           const val = parseInt(child[labels[j]]);
           if (!Number.isInteger(val) || val < 1) {
-            this.mode_data.childErrors = `Row #${i + 1}: ${labels[j]} must be at least 1 unit.`;
+            this.mode_data.childErrors = `Item Row #${i + 1}: ${labels[j]} must be a positive integer.`;
             return false;
           }
         }
@@ -734,7 +837,7 @@ export default {
         for (let j = 0; j < labels.length - 1; j++) {
           const val = parseInt(parent[labels[j]]);
           if (!Number.isInteger(val) || val < 1) {
-            this.mode_data.parentErrors = `Stock Row #${i + 1}: ${labels[j]} must be at least 1 unit.`;
+            this.mode_data.parentErrors = `Stock Row #${i + 1}: ${labels[j]} must be a positive integer.`;
             return false;
           }
         }
@@ -790,11 +893,13 @@ export default {
         data = JSON.parse(data);
       }
       this.mode_data.result = data;
-      if (this.mode === "1d") {
-        this.draw1d();
-      } else {
-        this.draw2d();
-      }
+      this.$nextTick(() => {
+        if (this.mode === "1d") {
+          this.draw1d();
+        } else {
+          this.draw2d();
+        }
+      });
     },
 
     sortBigRolls(bigRolls) {
@@ -1078,12 +1183,22 @@ export default {
 }
 
 .loading-spinner {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border: 3px solid var(--bg-stone-subtle);
   border-top-color: var(--accent-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+}
+
+.loading-spinner-sm {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
 }
 
 @keyframes spin {
@@ -1123,12 +1238,10 @@ export default {
   border-radius: 8px;
 }
 
-.controls-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
+.strategy-selector {
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--clay-shadow-inset);
 }
 
 .radio-group {
@@ -1145,33 +1258,54 @@ export default {
   cursor: pointer;
 }
 
-.action-btns {
-  display: flex;
-  gap: 10px;
-}
-
-.summary-metrics {
+.action-trigger-row {
   display: flex;
   gap: 12px;
 }
 
-.metric-pill {
-  background: var(--bg-stone-subtle);
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  gap: 8px;
-  align-items: center;
+.optimise-hero-btn {
+  flex: 1;
+  padding: 14px 24px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
 }
 
-.metric-label {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+.progress-banner {
+  background: #edf3fc;
+  border: 1px solid rgba(74, 111, 165, 0.3);
+}
+
+.progress-status-flex {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.summary-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.metric-card {
+  background: var(--bg-stone-subtle);
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--clay-shadow-inset);
+  text-align: center;
 }
 
 .metric-value {
-  font-weight: 700;
-  color: var(--text-primary);
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.metric-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
 }
 
 .utilization-bar-container {
@@ -1213,5 +1347,19 @@ export default {
 
 .disabled-input {
   opacity: 0.6;
+}
+
+.empty-result-prompt {
+  background: var(--clay-bg);
+}
+
+.prompt-icon {
+  font-size: 2rem;
+  display: block;
+}
+
+.auto-margin {
+  margin-left: auto;
+  margin-right: auto;
 }
 </style>
